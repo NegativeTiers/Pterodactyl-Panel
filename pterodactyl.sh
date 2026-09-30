@@ -11,7 +11,7 @@ set -Eeuo pipefail
 #              Debian 13 (Trixie)
 # ============================================================
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 PANEL_DIR="/var/www/pterodactyl"
 PANEL_DOMAIN=""
@@ -41,6 +41,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
@@ -73,6 +74,54 @@ step() {
     echo
     echo -e "${CYAN}${BOLD}==> $1${RESET}"
     echo
+}
+
+# ------------------------------------------------------------
+# IMPORTANT:
+# Read interactive input from /dev/tty so that:
+#
+# curl ... | bash
+#
+# works correctly.
+# ------------------------------------------------------------
+
+ask() {
+    local prompt="$1"
+    local variable="$2"
+    local value
+
+    if [[ ! -r /dev/tty ]]; then
+        die "Interactive terminal (/dev/tty) is unavailable. Run this script from an interactive SSH terminal."
+    fi
+
+    read -r -p "$prompt" value </dev/tty
+    printf -v "$variable" '%s' "$value"
+}
+
+ask_secret() {
+    local prompt="$1"
+    local variable="$2"
+    local value
+
+    if [[ ! -r /dev/tty ]]; then
+        die "Interactive terminal (/dev/tty) is unavailable."
+    fi
+
+    read -r -s -p "$prompt" value </dev/tty
+    echo
+    printf -v "$variable" '%s' "$value"
+}
+
+confirm() {
+    local prompt="$1"
+    local answer
+
+    if [[ ! -r /dev/tty ]]; then
+        die "Interactive terminal (/dev/tty) is unavailable."
+    fi
+
+    read -r -p "$prompt" answer </dev/tty
+    echo "$answer"
 }
 
 trap 'error "Installation failed on line $LINENO."' ERR
@@ -121,6 +170,10 @@ fi
 
 step "Checking operating system"
 
+if [[ ! -f /etc/os-release ]]; then
+    die "Cannot detect operating system."
+fi
+
 source /etc/os-release
 
 if [[ "${ID:-}" != "debian" ]]; then
@@ -146,95 +199,10 @@ fi
 success "Architecture: $ARCH"
 
 # ============================================================
-# Domain / Admin configuration
-# ============================================================
-
-step "Panel configuration"
-
-read -rp "Panel domain (example: panel.example.com): " PANEL_DOMAIN
-
-[[ -n "$PANEL_DOMAIN" ]] || die "Panel domain cannot be empty."
-
-if [[ "$PANEL_DOMAIN" =~ [/:[:space:]] ]]; then
-    die "Enter only the hostname, e.g. panel.example.com"
-fi
-
-read -rp "Admin email: " ADMIN_EMAIL
-[[ -n "$ADMIN_EMAIL" ]] || die "Admin email cannot be empty."
-
-read -rp "Admin username: " ADMIN_USERNAME
-[[ -n "$ADMIN_USERNAME" ]] || die "Admin username cannot be empty."
-
-read -rp "Admin first name: " ADMIN_FIRSTNAME
-[[ -n "$ADMIN_FIRSTNAME" ]] || die "First name cannot be empty."
-
-read -rp "Admin last name: " ADMIN_LASTNAME
-[[ -n "$ADMIN_LASTNAME" ]] || die "Last name cannot be empty."
-
-read -rsp "Admin password: " ADMIN_PASSWORD
-echo
-
-[[ ${#ADMIN_PASSWORD} -ge 8 ]] ||
-    die "Admin password must be at least 8 characters."
-
-# ============================================================
-# Cloudflare
-# ============================================================
-
-echo
-read -rp "Enable Cloudflare Tunnel? [y/N]: " CF_ANSWER
-
-if [[ "$CF_ANSWER" =~ ^[Yy]$ ]]; then
-
-    CF_ENABLE="true"
-
-    echo
-    echo "Paste your Cloudflare Tunnel token."
-    echo "The token is NOT saved in this script."
-    echo
-
-    read -rsp "Cloudflare Tunnel Token: " CF_TOKEN
-    echo
-
-    [[ -n "$CF_TOKEN" ]] ||
-        die "Cloudflare Tunnel token cannot be empty."
-
-fi
-
-# ============================================================
-# Database password
-# ============================================================
-
-DB_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
-
-# ============================================================
-# Confirmation
-# ============================================================
-
-echo
-echo -e "${BOLD}Installation Summary${RESET}"
-echo "------------------------------------------"
-echo "Panel Domain : https://$PANEL_DOMAIN"
-echo "Panel Port   : localhost:$LOCAL_PORT"
-echo "Admin Email  : $ADMIN_EMAIL"
-echo "Database     : $DB_NAME"
-echo "DB User      : $DB_USER"
-echo "Cloudflare   : $CF_ENABLE"
-echo "------------------------------------------"
-echo
-
-read -rp "Continue installation? [Y/n]: " CONFIRM
-
-if [[ "$CONFIRM" =~ ^[Nn]$ ]]; then
-    echo "Installation cancelled."
-    exit 0
-fi
-
-# ============================================================
 # Network
 # ============================================================
 
-step "Checking network"
+step "Checking network connectivity"
 
 if ! ip route get 1.1.1.1 >/dev/null 2>&1; then
     die "No working IPv4 route detected."
@@ -244,10 +212,127 @@ if ! getent hosts github.com >/dev/null 2>&1; then
     die "DNS resolution is not working."
 fi
 
-success "Network is working."
+success "Network connectivity is working."
 
 # ============================================================
-# System update
+# Panel Configuration
+# ============================================================
+
+step "Panel configuration"
+
+ask "Panel domain (example: panel.example.com): " PANEL_DOMAIN
+
+[[ -n "$PANEL_DOMAIN" ]] ||
+    die "Panel domain cannot be empty."
+
+if [[ "$PANEL_DOMAIN" =~ [/:[:space:]] ]]; then
+    die "Enter only the hostname, for example: panel.example.com"
+fi
+
+if [[ ! "$PANEL_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    die "Invalid domain name."
+fi
+
+ask "Admin email: " ADMIN_EMAIL
+
+[[ -n "$ADMIN_EMAIL" ]] ||
+    die "Admin email cannot be empty."
+
+if [[ ! "$ADMIN_EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
+    die "Invalid email address."
+fi
+
+ask "Admin username: " ADMIN_USERNAME
+
+[[ -n "$ADMIN_USERNAME" ]] ||
+    die "Admin username cannot be empty."
+
+ask "Admin first name: " ADMIN_FIRSTNAME
+
+[[ -n "$ADMIN_FIRSTNAME" ]] ||
+    die "First name cannot be empty."
+
+ask "Admin last name: " ADMIN_LASTNAME
+
+[[ -n "$ADMIN_LASTNAME" ]] ||
+    die "Last name cannot be empty."
+
+ask_secret "Admin password: " ADMIN_PASSWORD
+
+[[ ${#ADMIN_PASSWORD} -ge 8 ]] ||
+    die "Admin password must be at least 8 characters."
+
+# Pterodactyl requires mixed case + number.
+if [[ ! "$ADMIN_PASSWORD" =~ [A-Z] ]]; then
+    die "Admin password must contain at least one uppercase letter."
+fi
+
+if [[ ! "$ADMIN_PASSWORD" =~ [a-z] ]]; then
+    die "Admin password must contain at least one lowercase letter."
+fi
+
+if [[ ! "$ADMIN_PASSWORD" =~ [0-9] ]]; then
+    die "Admin password must contain at least one number."
+fi
+
+# ============================================================
+# Cloudflare
+# ============================================================
+
+echo
+
+CF_ANSWER="$(confirm "Enable Cloudflare Tunnel? [y/N]: ")"
+
+if [[ "$CF_ANSWER" =~ ^[Yy]$ ]]; then
+
+    CF_ENABLE="true"
+
+    echo
+    echo "Paste your Cloudflare Tunnel token."
+    echo "The token will not be stored in this script."
+    echo
+
+    ask_secret "Cloudflare Tunnel Token: " CF_TOKEN
+
+    [[ -n "$CF_TOKEN" ]] ||
+        die "Cloudflare Tunnel token cannot be empty."
+fi
+
+# ============================================================
+# Generate Database Password
+# ============================================================
+
+DB_PASSWORD="$(openssl rand -hex 24)"
+
+[[ -n "$DB_PASSWORD" ]] ||
+    die "Could not generate database password."
+
+# ============================================================
+# Summary
+# ============================================================
+
+echo
+echo -e "${BOLD}Installation Summary${RESET}"
+echo "------------------------------------------"
+echo "Panel Domain : https://$PANEL_DOMAIN"
+echo "Local Origin : https://127.0.0.1:$LOCAL_PORT"
+echo "Admin Email  : $ADMIN_EMAIL"
+echo "Database     : $DB_NAME"
+echo "DB User      : $DB_USER"
+echo "Cloudflare   : $CF_ENABLE"
+echo "------------------------------------------"
+echo
+
+CONFIRM="$(confirm "Continue installation? [Y/n]: ")"
+
+if [[ "$CONFIRM" =~ ^[Nn]$ ]]; then
+    echo
+    warn "Installation cancelled."
+    exit 0
+fi
+
+# ============================================================
+# System Update
 # ============================================================
 
 step "Updating Debian"
@@ -258,16 +343,17 @@ apt-get update
 apt-get upgrade -y
 
 # ============================================================
-# Dependencies
+# Base Dependencies
 # ============================================================
 
-step "Installing Pterodactyl dependencies"
+step "Installing base dependencies"
 
 apt-get install -y \
     ca-certificates \
     curl \
     wget \
     gnupg \
+    gnupg2 \
     unzip \
     tar \
     git \
@@ -278,34 +364,90 @@ apt-get install -y \
     openssl \
     lsb-release \
     apt-transport-https \
-    software-properties-common \
-    php8.3 \
-    php8.3-cli \
-    php8.3-common \
-    php8.3-gd \
-    php8.3-mysql \
-    php8.3-mbstring \
-    php8.3-bcmath \
-    php8.3-xml \
-    php8.3-fpm \
-    php8.3-curl \
-    php8.3-zip
+    software-properties-common
 
-success "Dependencies installed."
+success "Base dependencies installed."
+
+# ============================================================
+# PHP Repository
+# ============================================================
+
+step "Configuring PHP 8.3 repository"
+
+install -d -m 0755 /etc/apt/keyrings
+
+curl -fsSL \
+    https://packages.sury.org/php/apt.gpg \
+    -o /etc/apt/keyrings/sury-php.gpg
+
+chmod 0644 /etc/apt/keyrings/sury-php.gpg
+
+cat > /etc/apt/sources.list.d/php.list <<EOF
+deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ trixie main
+EOF
+
+apt-get update
+
+success "PHP repository configured."
+
+# ============================================================
+# PHP
+# ============================================================
+
+step "Installing PHP $PHP_VERSION"
+
+apt-get install -y \
+    "php${PHP_VERSION}" \
+    "php${PHP_VERSION}-cli" \
+    "php${PHP_VERSION}-common" \
+    "php${PHP_VERSION}-gd" \
+    "php${PHP_VERSION}-mysql" \
+    "php${PHP_VERSION}-mbstring" \
+    "php${PHP_VERSION}-bcmath" \
+    "php${PHP_VERSION}-xml" \
+    "php${PHP_VERSION}-fpm" \
+    "php${PHP_VERSION}-curl" \
+    "php${PHP_VERSION}-zip"
+
+success "PHP $PHP_VERSION installed."
+
+php -v
+
+# ============================================================
+# Services
+# ============================================================
+
+step "Starting required services"
+
+systemctl enable --now mariadb
+systemctl enable --now redis-server
+systemctl enable --now nginx
+systemctl enable --now "php${PHP_VERSION}-fpm"
+systemctl enable --now cron
+
+success "MariaDB started."
+success "Redis started."
+success "Nginx started."
+success "PHP-FPM started."
+success "Cron started."
 
 # ============================================================
 # Composer
 # ============================================================
 
-step "Installing Composer"
+step "Installing Composer 2"
 
 if ! command -v composer >/dev/null 2>&1; then
 
-    curl -fsSL https://getcomposer.org/installer \
-        | php -- \
+    curl -fsSL \
+        https://getcomposer.org/installer \
+        -o /tmp/composer-setup.php
+
+    php /tmp/composer-setup.php \
         --install-dir=/usr/local/bin \
         --filename=composer
 
+    rm -f /tmp/composer-setup.php
 fi
 
 composer self-update --2 >/dev/null 2>&1 || true
@@ -315,40 +457,33 @@ success "Composer installed."
 composer --version
 
 # ============================================================
-# Services
-# ============================================================
-
-step "Starting services"
-
-systemctl enable --now mariadb
-systemctl enable --now redis-server
-systemctl enable --now nginx
-systemctl enable --now php8.3-fpm
-systemctl enable --now cron
-
-success "MariaDB started."
-success "Redis started."
-success "Nginx started."
-success "PHP-FPM started."
-
-# ============================================================
 # Database
 # ============================================================
 
 step "Creating Pterodactyl database"
 
 mariadb <<EOF
-CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
-CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
-ALTER USER '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
-GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'127.0.0.1';
+CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1'
+    IDENTIFIED BY '${DB_PASSWORD}';
+
+ALTER USER '${DB_USER}'@'127.0.0.1'
+    IDENTIFIED BY '${DB_PASSWORD}';
+
+GRANT ALL PRIVILEGES
+    ON \`${DB_NAME}\`.*
+    TO '${DB_USER}'@'127.0.0.1';
+
 FLUSH PRIVILEGES;
 EOF
 
 success "Database configured."
 
 # ============================================================
-# Download Panel
+# Download Pterodactyl
 # ============================================================
 
 step "Downloading Pterodactyl Panel"
@@ -357,7 +492,11 @@ mkdir -p "$PANEL_DIR"
 
 cd "$PANEL_DIR"
 
+rm -f panel.tar.gz
+
 curl -fL \
+    --retry 3 \
+    --retry-delay 2 \
     -o panel.tar.gz \
     https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
 
@@ -365,17 +504,23 @@ tar -xzf panel.tar.gz
 
 rm -f panel.tar.gz
 
-chmod -R 755 storage bootstrap/cache
-
 success "Pterodactyl Panel downloaded."
 
 # ============================================================
-# Composer dependencies
+# Permissions Before Composer
 # ============================================================
 
-step "Installing Panel dependencies"
+chmod -R 755 \
+    "$PANEL_DIR/storage" \
+    "$PANEL_DIR/bootstrap/cache"
 
-cp .env.example .env
+# ============================================================
+# Composer Dependencies
+# ============================================================
+
+step "Installing Pterodactyl dependencies"
+
+cp -f .env.example .env
 
 COMPOSER_ALLOW_SUPERUSER=1 \
 composer install \
@@ -384,23 +529,23 @@ composer install \
     --no-interaction \
     --no-progress
 
-success "Panel dependencies installed."
+success "Pterodactyl dependencies installed."
 
 # ============================================================
-# Application key
+# Application Key
 # ============================================================
 
 step "Generating application key"
 
 php artisan key:generate --force
 
-success "Application encryption key generated."
+success "Application key generated."
 
 # ============================================================
-# Pterodactyl environment
+# Environment
 # ============================================================
 
-step "Configuring Panel environment"
+step "Configuring Pterodactyl environment"
 
 php artisan p:environment:setup \
     -n \
@@ -411,20 +556,28 @@ php artisan p:environment:setup \
     --session="redis" \
     --queue="redis" \
     --redis-host="127.0.0.1" \
-    --redis-pass="null" \
+    --redis-pass="" \
     --redis-port="6379"
 
 php artisan p:environment:database \
+    -n \
     --host="127.0.0.1" \
     --port="3306" \
     --database="$DB_NAME" \
     --username="$DB_USER" \
     --password="$DB_PASSWORD"
 
-success "Panel environment configured."
+# Trust local reverse proxy / tunnel.
+if grep -q '^TRUSTED_PROXIES=' .env; then
+    sed -i 's/^TRUSTED_PROXIES=.*/TRUSTED_PROXIES=127.0.0.1/' .env
+else
+    echo 'TRUSTED_PROXIES=127.0.0.1' >> .env
+fi
+
+success "Pterodactyl environment configured."
 
 # ============================================================
-# Database migration
+# Database Migration
 # ============================================================
 
 step "Migrating Pterodactyl database"
@@ -434,12 +587,13 @@ php artisan migrate --seed --force
 success "Database migration completed."
 
 # ============================================================
-# Create Admin
+# Admin Account
 # ============================================================
 
 step "Creating administrator account"
 
 php artisan p:user:make \
+    -n \
     --email="$ADMIN_EMAIL" \
     --username="$ADMIN_USERNAME" \
     --name-first="$ADMIN_FIRSTNAME" \
@@ -453,7 +607,7 @@ success "Administrator account created."
 # Permissions
 # ============================================================
 
-step "Configuring file permissions"
+step "Configuring Panel permissions"
 
 chown -R www-data:www-data "$PANEL_DIR"
 
@@ -461,10 +615,10 @@ chmod -R 755 \
     "$PANEL_DIR/storage" \
     "$PANEL_DIR/bootstrap/cache"
 
-success "Permissions configured."
+success "Panel permissions configured."
 
 # ============================================================
-# Local TLS certificate
+# Local TLS Certificate
 # ============================================================
 
 step "Creating local HTTPS certificate"
@@ -481,8 +635,11 @@ openssl req \
     -subj "/CN=$PANEL_DOMAIN" \
     -addext "subjectAltName=DNS:$PANEL_DOMAIN,DNS:localhost,IP:127.0.0.1"
 
-chmod 600 /etc/nginx/ssl/pterodactyl/panel.key
-chmod 644 /etc/nginx/ssl/pterodactyl/panel.crt
+chmod 600 \
+    /etc/nginx/ssl/pterodactyl/panel.key
+
+chmod 644 \
+    /etc/nginx/ssl/pterodactyl/panel.crt
 
 success "Local TLS certificate created."
 
@@ -508,6 +665,7 @@ server {
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
 
     client_max_body_size 100m;
     client_body_timeout 120s;
@@ -563,7 +721,7 @@ systemctl restart nginx
 success "Nginx configured on 127.0.0.1:${LOCAL_PORT}."
 
 # ============================================================
-# Pterodactyl queue
+# Queue Worker
 # ============================================================
 
 step "Configuring Pterodactyl queue worker"
@@ -593,7 +751,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now pteroq.service
 
-success "Queue worker enabled."
+success "Pterodactyl queue worker enabled."
 
 # ============================================================
 # Cron
@@ -603,17 +761,19 @@ step "Configuring Panel scheduler"
 
 CRON_LINE="* * * * * php ${PANEL_DIR}/artisan schedule:run >> /dev/null 2>&1"
 
-if ! crontab -l 2>/dev/null | grep -Fq "$CRON_LINE"; then
-    (
-        crontab -l 2>/dev/null || true
-        echo "$CRON_LINE"
-    ) | crontab -
+CURRENT_CRON="$(crontab -l 2>/dev/null || true)"
+
+if ! grep -Fq "$CRON_LINE" <<< "$CURRENT_CRON"; then
+    {
+        printf '%s\n' "$CURRENT_CRON"
+        printf '%s\n' "$CRON_LINE"
+    } | crontab -
 fi
 
 success "Panel scheduler configured."
 
 # ============================================================
-# Cloudflare
+# Cloudflare Tunnel
 # ============================================================
 
 if [[ "$CF_ENABLE" == "true" ]]; then
@@ -624,10 +784,13 @@ if [[ "$CF_ENABLE" == "true" ]]; then
 
     curl -fsSL \
         https://pkg.cloudflare.com/cloudflare-main.gpg \
-        | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+        -o /usr/share/keyrings/cloudflare-main.gpg
 
-    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
-        > /etc/apt/sources.list.d/cloudflared.list
+    chmod 0644 /usr/share/keyrings/cloudflare-main.gpg
+
+    cat > /etc/apt/sources.list.d/cloudflared.list <<EOF
+deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main
+EOF
 
     apt-get update
     apt-get install -y cloudflared
@@ -645,63 +808,37 @@ if [[ "$CF_ENABLE" == "true" ]]; then
 
     success "Cloudflare Tunnel service installed."
 
-    # --------------------------------------------------------
-    # Configure origin settings
-    #
-    # Cloudflare's dashboard route should point to:
-    #
-    # https://localhost:8443
-    #
-    # Because this origin uses a self-signed certificate,
-    # enable "No TLS Verify" for the origin in Cloudflare.
-    # --------------------------------------------------------
-
     echo
-    warn "Cloudflare origin configuration:"
+    echo -e "${YELLOW}${BOLD}Cloudflare configuration${RESET}"
+    echo
+    echo "Public hostname:"
+    echo "  $PANEL_DOMAIN"
     echo
     echo "Service URL:"
-    echo "https://localhost:${LOCAL_PORT}"
+    echo "  https://localhost:${LOCAL_PORT}"
     echo
-    echo "In Cloudflare Tunnel > Public Hostname:"
-    echo "  Hostname : ${PANEL_DOMAIN}"
-    echo "  Service  : https://localhost:${LOCAL_PORT}"
+    echo "Origin Server Name:"
+    echo "  $PANEL_DOMAIN"
     echo
-    echo "Because the local certificate is self-signed,"
-    echo "set TLS -> No TLS Verify = ON for this origin."
+    echo "Because this installer creates a self-signed local"
+    echo "certificate, Cloudflare Tunnel must either trust"
+    echo "the certificate through a CA pool or temporarily"
+    echo "use:"
+    echo
+    echo "  Disable TLS Verification = ON"
+    echo
+    echo "Cloudflare documents originServerName and noTLSVerify"
+    echo "for HTTPS origins."
     echo
 
 fi
 
 # ============================================================
-# Final checks
+# Local HTTPS Test
 # ============================================================
 
-step "Running final health checks"
+step "Testing local HTTPS"
 
-FAILED=0
-
-SERVICES=(
-    mariadb
-    redis-server
-    php8.3-fpm
-    nginx
-    pteroq
-)
-
-if [[ "$CF_ENABLE" == "true" ]]; then
-    SERVICES+=(cloudflared)
-fi
-
-for SERVICE in "${SERVICES[@]}"; do
-    if systemctl is-active --quiet "$SERVICE"; then
-        success "$SERVICE is running"
-    else
-        error "$SERVICE is NOT running"
-        FAILED=1
-    fi
-done
-
-# Local HTTPS check
 if curl \
     -k \
     -fsS \
@@ -712,11 +849,45 @@ if curl \
     success "Local HTTPS endpoint is responding."
 
 else
+
     warn "Local HTTPS endpoint did not return a successful response."
+
 fi
 
 # ============================================================
-# Save credentials
+# Service Health
+# ============================================================
+
+step "Running service health checks"
+
+FAILED=0
+
+SERVICES=(
+    mariadb
+    redis-server
+    "php${PHP_VERSION}-fpm"
+    nginx
+    pteroq
+    cron
+)
+
+if [[ "$CF_ENABLE" == "true" ]]; then
+    SERVICES+=(cloudflared)
+fi
+
+for SERVICE in "${SERVICES[@]}"; do
+
+    if systemctl is-active --quiet "$SERVICE"; then
+        success "$SERVICE is running"
+    else
+        error "$SERVICE is NOT running"
+        FAILED=1
+    fi
+
+done
+
+# ============================================================
+# Save Installation Information
 # ============================================================
 
 step "Saving installation information"
@@ -749,50 +920,66 @@ Email: ${ADMIN_EMAIL}
 IMPORTANT
 ============================================================
 
-Back up the APP_KEY from:
-
+APP_KEY:
 ${PANEL_DIR}/.env
 
-Never lose your APP_KEY.
+BACK UP YOUR APP_KEY.
+
+Never expose:
+- APP_KEY
+- Database password
+- Admin password
+- Cloudflare Tunnel token
 
 ============================================================
 EOF
 
 chmod 600 /root/pterodactyl-install-info.txt
 
+success "Installation information saved."
+
 # ============================================================
 # Final
 # ============================================================
 
 echo
+
 echo -e "${GREEN}${BOLD}"
 echo "============================================================"
 echo "       PTERODACTYL PANEL INSTALLATION COMPLETE"
 echo "============================================================"
 echo -e "${RESET}"
 
-echo "Panel:"
+echo
+echo -e "${BOLD}Panel:${RESET}"
 echo "https://${PANEL_DOMAIN}"
 
 echo
-echo "Local origin:"
+echo -e "${BOLD}Local origin:${RESET}"
 echo "https://127.0.0.1:${LOCAL_PORT}"
 
 echo
-echo "Admin:"
+echo -e "${BOLD}Admin:${RESET}"
 echo "$ADMIN_USERNAME"
 
 echo
-echo "Installation information:"
+echo -e "${BOLD}Credentials file:${RESET}"
 echo "/root/pterodactyl-install-info.txt"
 
 if [[ "$CF_ENABLE" == "true" ]]; then
     echo
-    echo "Cloudflare Tunnel:"
+    echo -e "${BOLD}Cloudflare Tunnel:${RESET}"
     echo "Enabled"
+
     echo
-    echo "Cloudflare origin:"
+    echo -e "${BOLD}Cloudflare service:${RESET}"
     echo "https://localhost:${LOCAL_PORT}"
+
+    echo
+    echo -e "${YELLOW}Cloudflare dashboard:${RESET}"
+    echo "Public hostname : $PANEL_DOMAIN"
+    echo "Service         : https://localhost:${LOCAL_PORT}"
+    echo "Origin Server Name : $PANEL_DOMAIN"
 fi
 
 echo
@@ -801,6 +988,10 @@ if [[ "$FAILED" -eq 0 ]]; then
     success "All required services are running."
 else
     warn "One or more services need attention."
+    echo
+    echo "Check with:"
+    echo
+    echo "systemctl status mariadb redis-server nginx pteroq"
 fi
 
 echo
