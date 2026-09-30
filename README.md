@@ -1,6 +1,6 @@
 # 🚀 Pterodactyl Panel Easy Installer
 
-### ⚡ Automated Pterodactyl Panel + HTTPS + Cloudflare Tunnel Installer
+### Automated Pterodactyl Panel + HTTPS + Cloudflare Tunnel
 
 > **Installer made by NegativeTier**
 > **From SRNCLOUD Technologies**
@@ -8,15 +8,15 @@
 [![Debian](https://img.shields.io/badge/Debian-13%20Trixie-A81D33?style=for-the-badge\&logo=debian\&logoColor=white)](https://www.debian.org/)
 [![Pterodactyl](https://img.shields.io/badge/Pterodactyl-Panel-000000?style=for-the-badge\&logo=pterodactyl\&logoColor=white)](https://pterodactyl.io/)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=for-the-badge\&logo=cloudflare\&logoColor=white)](https://www.cloudflare.com/)
-[![Bash](https://img.shields.io/badge/Language-Bash-121011?style=for-the-badge\&logo=gnu-bash\&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Bash](https://img.shields.io/badge/Bash-Script-121011?style=for-the-badge\&logo=gnu-bash\&logoColor=white)](https://www.gnu.org/software/bash/)
 
 ---
 
 ## 📖 About
 
-**Pterodactyl Panel Easy Installer** is an automated Bash installer designed to make deploying the **Pterodactyl Panel** on Debian simple and fast.
+**Pterodactyl Panel Easy Installer** is a Bash-based installer created to simplify the deployment of the **Pterodactyl Panel** on a fresh Debian 13 server.
 
-The installer handles the main requirements automatically, including:
+It automates the majority of the setup process, including:
 
 * PHP
 * MariaDB
@@ -25,130 +25,167 @@ The installer handles the main requirements automatically, including:
 * Composer
 * Pterodactyl Panel
 * Database configuration
-* HTTPS
+* Admin account
 * Queue worker
-* Scheduler
+* Cron scheduler
+* Local HTTPS
 * Cloudflare Tunnel
+* Service health checks
 
-The goal is simple:
+### 🎯 Goal
 
-> **Run one installer → configure Pterodactyl → connect Cloudflare → start managing your servers.**
+```text
+Fresh Debian
+     ↓
+Run Installer
+     ↓
+Pterodactyl Panel
+     ↓
+Local HTTPS
+     ↓
+Cloudflare Tunnel
+     ↓
+Secure Panel Access
+```
 
 ---
 
 # ✨ Features
 
-### 🐧 Operating System
+## 🐧 Debian
 
-* Debian 13 (Trixie) detection
-* amd64 architecture validation
-* Network and DNS checks
-* Automatic package updates
+* Debian 13 (Trixie) validation
+* amd64 architecture check
+* Network validation
+* DNS validation
+* Automatic system update
 
-### 🦖 Pterodactyl Panel
+## 🦖 Pterodactyl Panel
 
-* Latest Pterodactyl Panel release
-* Automatic Composer installation
+* Downloads the latest Panel release
+* Composer 2 installation
 * Automatic `.env` configuration
-* Database creation
-* Database migrations
-* Admin account creation
-* Correct storage permissions
+* Application key generation
+* Database migration
+* Administrator account creation
+* File permissions
 
-### 🗄️ Database & Cache
+## 🗄️ Database
 
 * MariaDB
-* Redis
-* Automatic database/user creation
-* Secure randomly generated database password
+* Automatic database creation
+* Automatic database user
+* Randomly generated database password
+* Redis support
 
-### 🌐 Nginx
+## 🌐 Nginx
 
-* Automatic Nginx installation
-* Local-only origin
-* HTTPS enabled
-* TLS certificate generation
+* Nginx installation
 * PHP-FPM configuration
-* Upload size configuration
+* Local-only listener
+* HTTPS support
+* TLS certificate generation
+* 100 MB upload support
 
-### ☁️ Cloudflare Tunnel
-
-Optional Cloudflare Tunnel support:
+The local Panel listens on:
 
 ```text
-Internet
-   │
-   ▼
-Cloudflare
-   │
-   ▼
-Cloudflare Tunnel
-   │
-   ▼
-HTTPS localhost:8443
-   │
-   ▼
-Nginx
-   │
-   ▼
-Pterodactyl Panel
+127.0.0.1:8443
 ```
 
-This allows the Panel origin to remain bound to localhost instead of exposing Nginx directly to the public internet.
+---
 
-### ⚙️ Background Services
+# ☁️ Cloudflare Tunnel
 
-Automatically configures:
+Cloudflare Tunnel is optional.
+
+During installation:
 
 ```text
-pteroq.service
-cron
-PHP-FPM
-MariaDB
-Redis
-Nginx
-cloudflared
+Enable Cloudflare Tunnel? [y/N]:
+```
+
+Choose:
+
+```text
+y
+```
+
+The installer will ask for your Cloudflare Tunnel token.
+
+The token is entered interactively and is **not hard-coded into the GitHub script**.
+
+### Architecture
+
+```text
+                  INTERNET
+                      │
+                      ▼
+              ┌──────────────┐
+              │  CLOUDFLARE  │
+              └──────┬───────┘
+                     │
+                     ▼
+              ┌──────────────┐
+              │ cloudflared  │
+              └──────┬───────┘
+                     │
+              HTTPS :8443
+                     │
+                     ▼
+              ┌──────────────┐
+              │    NGINX     │
+              │ 127.0.0.1    │
+              └──────┬───────┘
+                     │
+                     ▼
+              ┌──────────────┐
+              │ PTERODACTYL  │
+              │    PANEL     │
+              └──────────────┘
+```
+
+---
+
+# 🚀 Installation
+
+## One Command
+
+### Curl
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NegativeTiers/Pterodactyl-Panel/main/pterodactyl.sh | bash
+```
+
+### Wget
+
+```bash
+wget -qO- https://raw.githubusercontent.com/NegativeTiers/Pterodactyl-Panel/main/pterodactyl.sh | bash
 ```
 
 ---
 
 # 📋 Requirements
 
-| Requirement  | Details                             |
-| ------------ | ----------------------------------- |
-| OS           | Debian 13 Trixie                    |
-| Architecture | amd64                               |
-| Access       | Root                                |
-| RAM          | Recommended 2 GB+                   |
-| Storage      | Recommended 20 GB+                  |
-| Network      | Working IPv4 + DNS                  |
-| Domain       | Required for HTTPS/Cloudflare setup |
+| Requirement      | Details                                    |
+| ---------------- | ------------------------------------------ |
+| Operating System | Debian 13 Trixie                           |
+| Architecture     | amd64                                      |
+| Access           | Root                                       |
+| Internet         | Required                                   |
+| IPv4             | Required                                   |
+| DNS              | Required                                   |
+| Domain           | Required for normal HTTPS/Cloudflare setup |
+| RAM              | 2 GB+ recommended                          |
+| Storage          | 20 GB+ recommended                         |
 
-> ⚠️ A fresh Debian installation is strongly recommended.
-
----
-
-# 🚀 Installation
-
-## 1️⃣ Download & Run
-
-### Curl
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/NegativeTiers/Pterodactyl-Installer/main/install-pterodactyl.sh | bash
-```
-
-### Wget
-
-```bash
-wget -qO- https://raw.githubusercontent.com/NegativeTiers/Pterodactyl-Installer/main/install-pterodactyl.sh | bash
-```
+> ⚠️ **Fresh Debian installation is strongly recommended.**
 
 ---
 
-# 🧙 Installer Setup
+# 🧙 Installation Process
 
-During installation, the script will ask for:
+The installer asks for:
 
 ```text
 Panel domain
@@ -180,125 +217,78 @@ Admin last name:
 Tier
 ```
 
----
-
-# ☁️ Cloudflare Tunnel Setup
-
-If you select:
-
-```text
-Enable Cloudflare Tunnel? [y/N]: y
-```
-
-the installer will ask for your Cloudflare Tunnel token.
-
-The token is **not stored inside the GitHub repository**.
-
-The installer then installs `cloudflared` and configures it as a system service.
+The installer then generates a secure random MariaDB password automatically.
 
 ---
 
-## Cloudflare Origin
+# 🔐 HTTPS
 
-After installation, configure the Tunnel public hostname in Cloudflare:
-
-```text
-Hostname:
-panel.example.com
-
-Service:
-https://localhost:8443
-```
-
-### Origin Settings
-
-Because the installer creates a local self-signed certificate, configure the Cloudflare origin to allow the self-signed certificate.
-
-```text
-TLS
-└── No TLS Verify
-       ON
-```
-
-> ⚠️ Do not publish your Cloudflare Tunnel token. Anyone who has the token may be able to run the tunnel connector.
-
----
-
-# 🔐 HTTPS Architecture
-
-The installer does **not** expose the local Nginx HTTPS listener publicly.
-
-It listens on:
+The installer creates a local TLS certificate and configures Nginx to listen only on:
 
 ```text
 127.0.0.1:8443
 ```
 
-Architecture:
+The generated certificate is stored at:
 
 ```text
-                   INTERNET
-                       │
-                       ▼
-                ┌─────────────┐
-                │  Cloudflare │
-                └──────┬──────┘
-                       │
-                       ▼
-                ┌─────────────┐
-                │ cloudflared │
-                └──────┬──────┘
-                       │
-                 HTTPS :8443
-                       │
-                       ▼
-                ┌─────────────┐
-                │    Nginx    │
-                │ 127.0.0.1   │
-                └──────┬──────┘
-                       │
-                       ▼
-                ┌─────────────┐
-                │ Pterodactyl │
-                │    Panel    │
-                └─────────────┘
+/etc/nginx/ssl/pterodactyl/
 ```
+
+The Nginx configuration uses:
+
+```text
+TLS 1.2
+TLS 1.3
+```
+
+and the Panel is not directly bound to the public interface.
 
 ---
 
-# 🌐 Panel Access
+# 🌎 Cloudflare Configuration
 
-After Cloudflare is configured:
+After installation, configure your Cloudflare Tunnel public hostname.
+
+### Public hostname
 
 ```text
-https://panel.example.com
+panel.example.com
 ```
 
-Login using the administrator account created during installation.
+### Service
+
+```text
+https://localhost:8443
+```
+
+Because this installer creates a local self-signed certificate, configure the Cloudflare origin to accept that certificate.
+
+> ⚠️ Keep your Cloudflare Tunnel token private. Never commit it to GitHub.
 
 ---
 
-# 🛠️ Installed Components
+# ⚙️ Services
 
-The installer configures:
+The installer configures the following services:
 
 ```text
-Pterodactyl Panel
-PHP 8.3
-PHP-FPM
-MariaDB
-Redis
-Nginx
-Composer 2
-Cron
-Cloudflared (optional)
+mariadb
+redis-server
+php8.3-fpm
+nginx
+pteroq
+cron
+cloudflared (optional)
 ```
+
+The installer also performs a final health check for these services.
 
 ---
 
-# ⚙️ Service Management
+# 🔧 Useful Commands
 
-### Pterodactyl Queue
+## Pterodactyl Queue
 
 ```bash
 systemctl status pteroq
@@ -310,12 +300,24 @@ Restart:
 systemctl restart pteroq
 ```
 
+Logs:
+
+```bash
+journalctl -u pteroq --no-pager -n 50
+```
+
 ---
 
-### Nginx
+## Nginx
 
 ```bash
 systemctl status nginx
+```
+
+Test configuration:
+
+```bash
+nginx -t
 ```
 
 Restart:
@@ -326,7 +328,7 @@ systemctl restart nginx
 
 ---
 
-### MariaDB
+## MariaDB
 
 ```bash
 systemctl status mariadb
@@ -334,7 +336,7 @@ systemctl status mariadb
 
 ---
 
-### Redis
+## Redis
 
 ```bash
 systemctl status redis-server
@@ -342,7 +344,15 @@ systemctl status redis-server
 
 ---
 
-### Cloudflare Tunnel
+## PHP-FPM
+
+```bash
+systemctl status php8.3-fpm
+```
+
+---
+
+## Cloudflare Tunnel
 
 ```bash
 systemctl status cloudflared
@@ -354,138 +364,155 @@ Restart:
 systemctl restart cloudflared
 ```
 
----
-
-# 🔍 Troubleshooting
-
-## Check Pterodactyl
-
-```bash
-cd /var/www/pterodactyl
-
-php artisan about
-```
-
-## Check Pterodactyl logs
-
-```bash
-tail -f /var/www/pterodactyl/storage/logs/laravel.log
-```
-
-## Check Nginx
-
-```bash
-nginx -t
-```
-
-## Check Nginx logs
-
-```bash
-journalctl -u nginx --no-pager -n 50
-```
-
-## Check queue worker
-
-```bash
-journalctl -u pteroq --no-pager -n 50
-```
-
-## Check Cloudflare
+Logs:
 
 ```bash
 journalctl -u cloudflared --no-pager -n 50
 ```
 
-## Check local HTTPS
+---
+
+# 🔍 Pterodactyl Logs
+
+Panel logs:
+
+```bash
+tail -f /var/www/pterodactyl/storage/logs/laravel.log
+```
+
+Check Panel:
+
+```bash
+cd /var/www/pterodactyl
+php artisan about
+```
+
+---
+
+# 🌐 Test Local HTTPS
+
+The local origin can be tested with:
 
 ```bash
 curl -k https://127.0.0.1:8443
 ```
 
----
-
-# 🔑 Installation Information
-
-The installer stores installation information at:
-
-```text
-/root/pterodactyl-install-info.txt
-```
-
-This contains:
-
-```text
-Panel URL
-Database name
-Database username
-Database password
-Admin username
-```
-
-### ⚠️ Keep this file private.
-
-It contains sensitive credentials.
-
-Permissions are automatically set to:
-
-```text
-600
-```
+The installer also performs its own HTTPS health check before finishing.
 
 ---
 
-# 🔐 APP_KEY
+# 📁 Important Files
 
-Your Pterodactyl application key is stored in:
+### Pterodactyl
+
+```text
+/var/www/pterodactyl
+```
+
+### Environment
 
 ```text
 /var/www/pterodactyl/.env
 ```
 
-### ⚠️ NEVER delete or expose your `APP_KEY`.
-
-Always back it up before migrating or reinstalling the Panel.
-
----
-
-# 🧹 Uninstall
-
-This installer does **not** provide an automatic uninstall command.
-
-This is intentional because removing Pterodactyl, MariaDB, Redis, and Nginx automatically could destroy existing server data.
-
-If you want to remove the installation, manually review the services and data before deleting anything.
-
----
-
-# 🐛 Reporting Issues
-
-If you encounter an issue:
-
-1. Check the troubleshooting commands above.
-2. Check the service logs.
-3. Make sure you're using Debian 13.
-4. Make sure DNS is configured correctly.
-5. Open a GitHub issue.
-
-Please include:
+### Nginx
 
 ```text
-Debian version
-Architecture
-Pterodactyl version
-Error message
-Relevant logs
+/etc/nginx/sites-available/pterodactyl.conf
 ```
 
-**Do not post:**
+### TLS
 
 ```text
-Cloudflare Tunnel Token
-Database Password
-APP_KEY
-Admin Password
-Private Keys
+/etc/nginx/ssl/pterodactyl/
+```
+
+### Installation information
+
+```text
+/root/pterodactyl-install-info.txt
+```
+
+---
+
+# 🔑 APP_KEY
+
+Your Pterodactyl `APP_KEY` is stored inside:
+
+```text
+/var/www/pterodactyl/.env
+```
+
+### ⚠️ IMPORTANT
+
+**Never expose or delete your APP_KEY.**
+
+Back it up securely before performing migrations or reinstallations.
+
+---
+
+# 🛡️ Security
+
+This installer changes system-level configuration.
+
+It can modify:
+
+* APT packages
+* Nginx
+* PHP-FPM
+* MariaDB
+* Redis
+* Cron
+* Systemd services
+* `/var/www/pterodactyl`
+* TLS configuration
+
+Review the script before running it on an existing production server.
+
+---
+
+# 🐛 Troubleshooting
+
+### Check all major services
+
+```bash
+systemctl status \
+mariadb \
+redis-server \
+php8.3-fpm \
+nginx \
+pteroq
+```
+
+### Check Nginx
+
+```bash
+nginx -t
+```
+
+### Check Panel
+
+```bash
+cd /var/www/pterodactyl
+php artisan about
+```
+
+### Check Laravel logs
+
+```bash
+tail -100 /var/www/pterodactyl/storage/logs/laravel.log
+```
+
+### Check queue
+
+```bash
+journalctl -u pteroq -n 100 --no-pager
+```
+
+### Check Cloudflare
+
+```bash
+journalctl -u cloudflared -n 100 --no-pager
 ```
 
 ---
@@ -494,31 +521,57 @@ Private Keys
 
 ### GitHub
 
-**NegativeTiers/Pterodactyl-Installer**
+**NegativeTiers/Pterodactyl-Panel**
 
 ```text
-https://github.com/NegativeTiers/Pterodactyl-Installer
+https://github.com/NegativeTiers/Pterodactyl-Panel
 ```
 
 ### Installer
 
 ```text
-install-pterodactyl.sh
+https://raw.githubusercontent.com/NegativeTiers/Pterodactyl-Panel/main/pterodactyl.sh
 ```
 
 ---
 
-# ⭐ Support the Project
+# 🤝 Contributing
 
-If this installer helped you deploy Pterodactyl:
+Pull requests, bug reports and improvements are welcome.
 
-⭐ **Star the repository**
+Before opening an issue, please provide:
 
-🐛 **Report bugs**
+```text
+Debian version
+Architecture
+Error message
+Relevant logs
+Pterodactyl version
+```
 
-💡 **Suggest improvements**
+### Never include:
 
-🔧 **Submit pull requests**
+```text
+Cloudflare Tunnel Token
+Database Password
+Admin Password
+APP_KEY
+Private Keys
+```
+
+---
+
+# ⭐ Support
+
+If this installer helped you:
+
+⭐ Star the repository
+
+🐛 Report bugs
+
+💡 Suggest improvements
+
+🔧 Submit pull requests
 
 ---
 
@@ -528,26 +581,28 @@ If this installer helped you deploy Pterodactyl:
 
 ### From SRNCLOUD Technologies
 
-Built for simple, fast and automated Pterodactyl deployments.
+Built with the goal of making Pterodactyl deployment:
+
+**Simple • Fast • Automated**
 
 ---
 
-# 📜 Disclaimer
+# ⚠️ Disclaimer
 
-This is a third-party installation script and is not an official Pterodactyl or Cloudflare product.
+This is an independent third-party installation script.
 
-Always review scripts before executing them on production infrastructure.
+It is **not an official Pterodactyl or Cloudflare installer**.
 
-Use this installer at your own risk and maintain regular backups of your Panel and database.
+Always review scripts before running them on production infrastructure and maintain regular backups.
 
 ---
 
 <p align="center">
 
-### ⚡ Built by NegativeTier
+## ⚡ NegativeTier
 
-### 🏢 SRNCLOUD Technologies
+### SRNCLOUD Technologies
 
-**Simple • Fast • Automated**
+**Pterodactyl • Automation • Infrastructure**
 
 </p>
